@@ -1,0 +1,6 @@
+@echo off
+echo Starting Backend...
+start cmd /k "cd backend && ..\venv\Scripts\python.exe -m uvicorn main:app"
+echo Starting Frontend...
+cd frontend
+npm run dev

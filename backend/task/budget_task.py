@@ -17,6 +17,10 @@ def create_budget_task(agent, destination: str, budget_range: str, user_location
           Local transport (per day)
         - Provide ranges, NOT exact numbers
         - Do NOT exaggerate
+        -Do not ask question to user
+        -Destination: {destination}
+        -Traveler origin: {user_location}
+        -Budget preference: {budget_range}
         """,
         agent=agent,
         expected_output="A clean budget breakdown with clear cost ranges."
