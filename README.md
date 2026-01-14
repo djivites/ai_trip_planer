@@ -22,7 +22,7 @@ This project uniquely combines **multiple LLM providers** to optimize **speed, c
 * 💡 Practical travel tips
 * 🧾 Clean final trip summary
 * ⚡ FastAPI backend (API-ready)
-* 🌐 Frontend-ready (Streamlit / React compatible)
+* 🌐 Frontend-ready 
 
 ---
 
