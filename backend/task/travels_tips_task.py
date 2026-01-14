@@ -10,6 +10,13 @@ def create_travel_tips_task(agent, destination: str):
         - Prioritize reputable travel blogs and video descriptions.
         - Extract practical advice only.
         - Limit output to 5 bullet points.
+        IMPORTANT OUTPUT RULES:
+- Do NOT include "Thought", "Action", or reasoning
+- Do NOT explain your role
+- Output ONLY the final answer
+- Do NOT mention websites or tools
+
+
         """,
         agent=agent,
         expected_output="""

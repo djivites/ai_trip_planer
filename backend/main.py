@@ -1,11 +1,12 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from crewai import Crew, LLM
 from dotenv import load_dotenv
-import os
 
-# Import agents and tasks
-# Assuming running from root as: uvicorn backend.main:app
+load_dotenv()
+
+# ---------- IMPORT AGENTS & TASKS ----------
 try:
     from backend.agents.destination_agent import create_destination_agent
     from backend.agents.attraction_agent import create_attraction_agent
@@ -21,7 +22,6 @@ try:
     from backend.task.itinerary_ask import create_itinerary_task
     from backend.task.summary_task import create_summary_task
 except ImportError:
-    # Fallback for running directly from backend/
     from agents.destination_agent import create_destination_agent
     from agents.attraction_agent import create_attraction_agent
     from agents.budget_agent import create_budget_agent
@@ -36,11 +36,7 @@ except ImportError:
     from task.itinerary_ask import create_itinerary_task
     from task.summary_task import create_summary_task
 
-load_dotenv()
-
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-
+# ---------- FASTAPI ----------
 app = FastAPI(title="AI Trip Planner API")
 
 app.add_middleware(
@@ -51,6 +47,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ---------- SCHEMAS ----------
 class TripRequest(BaseModel):
     destination: str
     start_location: str
@@ -58,58 +55,73 @@ class TripRequest(BaseModel):
     budget: str
     style: str
 
-class TripResponse(BaseModel):
-    result: list[dict[str, str]]
+class AgentOutput(BaseModel):
+    agent: str
+    content: str
 
+class TripResponse(BaseModel):
+    result: list[AgentOutput]
+
+# ---------- HEALTH ----------
 @app.get("/api/health")
-def health_check():
+def health():
     return {"status": "ok"}
 
+# ---------- MAIN ENDPOINT ----------
 @app.post("/api/plan-trip", response_model=TripResponse)
 def plan_trip(request: TripRequest):
     try:
-        # LLM Config
-        llm = LLM(
-    model="ollama/llama3",
+        
+        # GROQ (FAST, SHORT OUTPUT)
+        llm_groq = LLM(
+            model="groq/llama-3.1-8b-instant",
+            temperature=0.2,
+            
+        )
+
+        # GEMINI (REASONING)
+        llm_gemini =  LLM(
+    model="gemini/gemini-2.5-flash",
     provider="litellm",
     temperature=0.2,
-    max_tokens=600,
+            # SMALL
 )
 
+        # LOCAL LLAMA (LONG THINKING)
+        llm_llama = LLM(
+            model="ollama/llama3",
+            provider="litellm",
+            temperature=0.2,
+            
+        )
+
+
         # Agents
-        destination_agent = create_destination_agent(llm)
-        attraction_agent = create_attraction_agent(llm)
-        budget_agent = create_budget_agent(llm)
-        tips_agent = create_travel_tips_agent(llm)
-        itinerary_agent = create_itinerary_agent(llm)
-        summary_agent = create_summary_agent(llm)
+        destination_agent = create_destination_agent(llm_llama)
+        attraction_agent  = create_attraction_agent(llm_llama)
+        budget_agent      = create_budget_agent(llm_llama)
+        tips_agent        = create_travel_tips_agent(llm_llama)
+        itinerary_agent   = create_itinerary_agent(llm_gemini)
+        summary_agent     = create_summary_agent(llm_groq)
 
         # Tasks
         user_preferences = f"""
-        Destination: {request.destination}
-        Starting location: {request.start_location}
-        Travel style: {request.style}
-        Budget: {request.budget}
-        Trip duration: {request.days} days
-        """
+Destination: {request.destination}
+Starting location: {request.start_location}
+Travel style: {request.style}
+Budget: {request.budget}
+Trip duration: {request.days} days
+"""
 
-        task1 = create_destination_task(destination_agent, request.destination, user_preferences)
-        task2 = create_attraction_task(attraction_agent, request.destination)
-        task3 = create_budget_task(
-            budget_agent,
-            request.destination,
-            request.budget,
-            request.start_location
-        )
-        task4 = create_travel_tips_task(tips_agent, request.destination)
-        task5 = create_itinerary_task(
-            itinerary_agent,
-            request.destination,
-            request.days
-        )
-        task6 = create_summary_task(summary_agent, request.destination)
+        tasks = [
+            create_destination_task(destination_agent, request.destination, user_preferences),
+            create_attraction_task(attraction_agent, request.destination),
+            create_budget_task(budget_agent, request.destination, request.budget, request.start_location),
+            create_travel_tips_task(tips_agent, request.destination),
+            create_itinerary_task(itinerary_agent, request.destination, request.days, request.style),
+            create_summary_task(summary_agent, request.destination),
+        ]
 
-        # Crew
         crew = Crew(
             agents=[
                 destination_agent,
@@ -119,31 +131,31 @@ def plan_trip(request: TripRequest):
                 itinerary_agent,
                 summary_agent
             ],
-            tasks=[task1, task2, task3, task4, task5, task6],
+            tasks=tasks,
             process="sequential",
-            verbose=True
+            verbose=False
         )
 
         result = crew.kickoff()
-        
-        # Format output
-        formatted_results = []
-        if hasattr(result, "tasks_output"):
-             for task in result.tasks_output:
-                 content = str(task.raw)
-                 if content:
-                     formatted_results.append({
-                         "agent": str(task.agent),
-                         "content": content
-                     })
-        else:
-            formatted_results.append({"agent": "Result", "content": str(result)})
 
-        return TripResponse(result=formatted_results)
+      
+        formatted = []
+        for i, task_output in enumerate(result.tasks_output):
+            content = task_output.raw
+            if content:
+                agent_name = (
+                    task_output.agent.role
+                    if hasattr(task_output.agent, "role")
+                    else f"Agent {i+1}"
+                )
+                formatted.append({
+                    "agent": agent_name,
+                    "content": content.strip()
+                })
+
+
+
+        return TripResponse(result=formatted)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)

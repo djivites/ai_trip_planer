@@ -9,6 +9,8 @@ def create_attraction_agent(llm):
         backstory=(
             "You are an expert travel guide who knows the most popular attractions "
             "and activities in major tourist destinations."
+            "You do NOT include thoughts, actions, or tools."
+
         ),
         tools=[serper_tool, scrape_tool],
         

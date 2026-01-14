@@ -19,6 +19,13 @@ STRICT RULES:
 - Do NOT add new information
 - Write in clear markdown
 - Be concise but complete
+IMPORTANT OUTPUT RULES:
+- Do NOT include "Thought", "Action", or reasoning
+- Do NOT explain your role
+- Output ONLY the final answer
+- Do NOT mention websites or tools
+
+
 """,
         agent=agent,
         expected_output="A structured final trip summary."

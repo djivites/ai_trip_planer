@@ -18,6 +18,13 @@ Example format:
 • Attraction – short description
 
 Limit to 6–8 attractions.
+IMPORTANT OUTPUT RULES:
+- Do NOT include "Thought", "Action", or reasoning
+- Do NOT explain your role
+- Output ONLY the final answer
+- Do NOT mention websites or tools
+
+
 """,
         agent=agent,
         expected_output="A clean bullet list of attractions with short descriptions."
